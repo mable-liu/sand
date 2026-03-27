@@ -1,0 +1,148 @@
+origin      = box_p2
+box_origin  = pose_trans(box_plane, p[0,0,0,0,0,0])
+box_y_point = pose_trans(box_plane, p[1,0,0,0,0,0])
+box_x_point = pose_trans(box_plane, p[0,1,0,0,0,0])
+
+box_y_dir_y = box_y_point[0] - box_origin[0]
+box_y_dir_x = box_y_point[1] - box_origin[1]
+box_x_dir_y = box_x_point[0] - box_origin[0]
+box_x_dir_x = box_x_point[1] - box_origin[1]
+
+diff_y      = origin[0] - box_origin[0]
+diff_x      = origin[1] - box_origin[1]
+tank_length = diff_y * box_y_dir_y + diff_x * box_y_dir_x
+tank_width  = diff_y * box_x_dir_y + diff_x * box_x_dir_x
+if tank_length < 0:
+  tank_length = -tank_length
+end
+if tank_width < 0:
+  tank_width = -tank_width
+end
+
+num_rows     = 5
+num_layers   = 4
+layer_height = 0.10
+speed        = 0.3
+acceleration = 0.3
+wall_margin  = 0.03
+
+row_spacing_x = (tank_width  - 2 * wall_margin) / (num_rows - 1)
+row_spacing_y = (tank_length - 2 * wall_margin) / (num_rows - 1)
+path_length_y = tank_length - 2 * wall_margin
+path_length_x = tank_width  - 2 * wall_margin
+
+local cx = 1
+local cy = 1
+
+movej(origin, a=1.0, v=0.5)
+popup("Start dispensing sand?", "Confirm", False, False, True)
+
+global g_pos = get_actual_tcp_pose()
+
+local layer = 0
+while layer < num_layers:
+
+  if (layer % 2) == 0:
+    local y_dir = 1.0
+    if cx == 1:
+      y_dir = -1.0
+    end
+    local x_step = 1.0
+    if cy == 1:
+      x_step = -1.0
+    end
+    local turn_r = row_spacing_x / 2
+
+    local row = 0
+    while row < num_rows:
+      if row == num_rows - 1:
+        g_pos[0] = g_pos[0] + y_dir * path_length_y * box_y_dir_y
+        g_pos[1] = g_pos[1] + y_dir * path_length_y * box_y_dir_x
+        movel(g_pos, a=acceleration, v=speed, r=0)
+      else:
+        g_pos[0] = g_pos[0] + y_dir * path_length_y * box_y_dir_y
+        g_pos[1] = g_pos[1] + y_dir * path_length_y * box_y_dir_x
+        movel(g_pos, a=acceleration, v=speed, r=turn_r)
+        local via0 = g_pos[0] + y_dir * turn_r * box_y_dir_y + x_step * turn_r * box_x_dir_y
+        local via1 = g_pos[1] + y_dir * turn_r * box_y_dir_x + x_step * turn_r * box_x_dir_x
+        local p_via = p[via0, via1, g_pos[2], g_pos[3], g_pos[4], g_pos[5]]
+        g_pos[0] = g_pos[0] + x_step * row_spacing_x * box_x_dir_y
+        g_pos[1] = g_pos[1] + x_step * row_spacing_x * box_x_dir_x
+        movec(p_via, g_pos, a=acceleration, v=speed, r=turn_r)
+      end
+      y_dir = -y_dir
+      row = row + 1
+    end
+
+    if (num_rows % 2) == 1:
+      if cx == 0:
+        cx = 1
+      else:
+        cx = 0
+      end
+    end
+    if cy == 0:
+      cy = 1
+    else:
+      cy = 0
+    end
+
+  else:
+    local x_dir = 1.0
+    if cy == 1:
+      x_dir = -1.0
+    end
+    local y_step = 1.0
+    if cx == 1:
+      y_step = -1.0
+    end
+    local turn_r = row_spacing_y / 2
+
+    local row = 0
+    while row < num_rows:
+      if row == num_rows - 1:
+        g_pos[0] = g_pos[0] + x_dir * path_length_x * box_x_dir_y
+        g_pos[1] = g_pos[1] + x_dir * path_length_x * box_x_dir_x
+        movel(g_pos, a=acceleration, v=speed, r=0)
+      else:
+        g_pos[0] = g_pos[0] + x_dir * path_length_x * box_x_dir_y
+        g_pos[1] = g_pos[1] + x_dir * path_length_x * box_x_dir_x
+        movel(g_pos, a=acceleration, v=speed, r=turn_r)
+        local via0 = g_pos[0] + x_dir * turn_r * box_x_dir_y + y_step * turn_r * box_y_dir_y
+        local via1 = g_pos[1] + x_dir * turn_r * box_x_dir_x + y_step * turn_r * box_y_dir_x
+        local p_via = p[via0, via1, g_pos[2], g_pos[3], g_pos[4], g_pos[5]]
+        g_pos[0] = g_pos[0] + y_step * row_spacing_y * box_y_dir_y
+        g_pos[1] = g_pos[1] + y_step * row_spacing_y * box_y_dir_x
+        movec(p_via, g_pos, a=acceleration, v=speed, r=turn_r)
+      end
+      x_dir = -x_dir
+      row = row + 1
+    end
+
+    if (num_rows % 2) == 1:
+      if cy == 0:
+        cy = 1
+      else:
+        cy = 0
+      end
+    end
+    if cx == 0:
+      cx = 1
+    else:
+      cx = 0
+    end
+
+  end
+
+  layer = layer + 1
+
+  if layer < num_layers:
+    g_pos[2] = g_pos[2] + layer_height
+    movel(g_pos, a=acceleration, v=speed)
+  end
+
+end
+
+g_pos[2] = g_pos[2] + 0.1
+movel(g_pos, a=acceleration, v=speed)
+popup("Sand dispensing complete!", "Done", False, False, True)
